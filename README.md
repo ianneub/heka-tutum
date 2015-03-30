@@ -22,6 +22,7 @@ Example configuration:
     decoder = "TutumDecoder"
     
     [TutumDecoder]
+    auth = "ApiKey asdf:13246546874624135798462"
     
 ## Questions
 
