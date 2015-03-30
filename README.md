@@ -14,7 +14,7 @@ To use this plugin you will need to add this project to your Heka source code by
     add_external_plugin(git https://github.com/ianneub/heka-tutum master)
 
 
-### TagsDecoder
+### TutumDecoder
 
 Example configuration:
 
