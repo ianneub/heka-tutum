@@ -17,8 +17,10 @@ package tutum
 import (
   . "github.com/mozilla-services/heka/pipeline"
   "github.com/mozilla-services/heka/message"
-  // "fmt"
-  // "time"
+  "net/http"
+  "fmt"
+  "encoding/json"
+  "io/ioutil"
 )
 
 type TutumDecoderConfig struct {
@@ -28,12 +30,29 @@ type TutumDecoderConfig struct {
   // parsed against the specified TimestampLayout. All specified user fields
   // will be created as strings.
   MessageFields MessageTemplate `toml:"message_fields"`
-  ApiKey []string `toml:"api_key"`
+  Auth string `toml:"auth"`
 }
 
 type TutumDecoder struct {
   messageFields MessageTemplate
-  apikey []string
+  auth string
+  services map[string]tutumService
+}
+
+type tutumService struct {
+  Id string `json:"uuid"`
+  Name string `json:"name"`
+}
+
+type tutumContainer struct {
+  Id string `json:"uuid"`
+  Name string `json:"name"`
+  ServicePath string `json:"service"`
+}
+
+type tutumStack struct {
+  Id string `json:"uuid"`
+  Name string `json:"name"`
 }
 
 func (td *TutumDecoder) ConfigStruct() interface{} {
@@ -43,26 +62,104 @@ func (td *TutumDecoder) ConfigStruct() interface{} {
 func (td *TutumDecoder) Init(config interface{}) (err error) {
   conf := config.(*TutumDecoderConfig)
   td.messageFields = conf.MessageFields
-  td.apikey = conf.ApiKey
+  td.auth = conf.Auth
+  td.services = make(map[string]tutumService)
   return
 }
 
 func (td *TutumDecoder) Decode(pack *PipelinePack) (packs []*PipelinePack, err error) {
   // fmt.Printf("Message: %v\n", pack.Message)
-  // fmt.Printf("Tags: %v\n", td.tags)
 
-  field := message.NewFieldInit("Tags", message.Field_STRING, "")
-  for _, value := range td.tags {
-    field.AddValue(value)
+  // get ContainerName
+  container_name := pack.Message.FindFirstField("ContainerName").GetValueString()[0]
+
+  // if ContainerName is NOT in cache; then get it
+  service, ok := td.services[container_name]
+  if !ok {
+    // find the value
+    service, err = td.get_tutum_service(container_name)
+    if err != nil {
+      return
+    }
+
+    // save the value to the cache
+    td.services[container_name] = service
   }
+
+  // add fields to message with tutum data
+  field := message.NewFieldInit("TutumServiceName", message.Field_STRING, "")
+  field.AddValue(service.Name)
   pack.Message.AddField(field)
+
+  field = message.NewFieldInit("TutumServiceId", message.Field_STRING, "")
+  field.AddValue(service.Id)
+  pack.Message.AddField(field)
+  
   // fmt.Printf("Message: %v\n", pack.Message)
   if err = td.messageFields.PopulateMessage(pack.Message, nil); err != nil {
     return
   }
-  // time.Sleep(1 * time.Second)
+  
   // fmt.Printf("Message: %v\n", pack.Message)
   return []*PipelinePack{pack}, nil
+}
+
+func (td *TutumDecoder) get_tutum_service(container_name string) (service tutumService, err error) {
+  fmt.Printf("Finding Tutum service from container named: %s\n", container_name)
+  
+  // get container information
+  url := fmt.Sprintf("/api/v1/container/%s/", container_name)
+  data, err := td.get_tutum_uri(url)
+  if err != nil {
+    return
+  }
+
+  // parse response
+  var resp tutumContainer
+  err = json.Unmarshal(data, &resp)
+  if err != nil {
+    return
+  }
+  // fmt.Printf("json: %v\n\n", resp)
+
+  // get service information
+  data, err = td.get_tutum_uri(resp.ServicePath)
+  if err != nil {
+    return
+  }
+
+  // parse response
+  err = json.Unmarshal(data, &service)
+  if err != nil {
+    return
+  }
+
+  return
+}
+
+func (td *TutumDecoder) get_tutum_uri(uri string) (json []byte, err error) {
+  base_url := "https://dashboard.tutum.co"
+  url := fmt.Sprintf("%s%s", base_url, uri)
+
+  client := &http.Client{}
+
+  req, err := http.NewRequest("GET", url, nil)
+  req.Header.Add("Authorization", td.auth)
+  req.Header.Add("Accept", "application/json")
+
+  resp, err := client.Do(req)
+  if err != nil {
+    return
+  }
+
+  // read body
+  defer resp.Body.Close()
+  json, err = ioutil.ReadAll(resp.Body)
+  if err != nil {
+    return
+  }
+
+  return
 }
 
 func init() {
