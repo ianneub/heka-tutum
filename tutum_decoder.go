@@ -42,6 +42,8 @@ type TutumDecoder struct {
 type tutumService struct {
   Id string `json:"uuid"`
   Name string `json:"name"`
+  StackPath string `json:"stack"`
+  Stack tutumStack
 }
 
 type tutumContainer struct {
@@ -86,14 +88,27 @@ func (td *TutumDecoder) Decode(pack *PipelinePack) (packs []*PipelinePack, err e
     td.services[container_name] = service
   }
 
-  // add fields to message with tutum data
-  field := message.NewFieldInit("TutumServiceName", message.Field_STRING, "")
-  field.AddValue(service.Name)
-  pack.Message.AddField(field)
+  // add fields to message with tutum service data
+  if service.Name != "" {
+    field := message.NewFieldInit("TutumServiceName", message.Field_STRING, "")
+    field.AddValue(service.Name)
+    pack.Message.AddField(field)
 
-  field = message.NewFieldInit("TutumServiceId", message.Field_STRING, "")
-  field.AddValue(service.Id)
-  pack.Message.AddField(field)
+    field = message.NewFieldInit("TutumServiceId", message.Field_STRING, "")
+    field.AddValue(service.Id)
+    pack.Message.AddField(field)
+  }
+
+  if service.Stack.Name != "" {
+    // add fields to message with tutum stack data
+    field := message.NewFieldInit("TutumStackName", message.Field_STRING, "")
+    field.AddValue(service.Stack.Name)
+    pack.Message.AddField(field)
+
+    field = message.NewFieldInit("TutumStackId", message.Field_STRING, "")
+    field.AddValue(service.Stack.Id)
+    pack.Message.AddField(field)    
+  }
   
   // fmt.Printf("Message: %v\n", pack.Message)
   if err = td.messageFields.PopulateMessage(pack.Message, nil); err != nil {
@@ -131,6 +146,31 @@ func (td *TutumDecoder) get_tutum_service(container_name string) (service tutumS
 
     // parse response
     err = json.Unmarshal(data, &service)
+    if err != nil {
+      return
+    }
+
+    // get stack information
+    if service.StackPath != "" {
+      service.Stack, err = td.get_tutum_stack(service.StackPath)
+    }
+  }
+
+  return
+}
+
+func (td *TutumDecoder) get_tutum_stack(uri string) (stack tutumStack, err error) {
+  fmt.Printf("Finding Tutum stack at URI: %s\n", uri)
+  
+  // get container information
+  data, err := td.get_tutum_uri(uri)
+  if err != nil {
+    return
+  }
+  // if we get back data, then let's parse it. otherwise we can return an empty stack
+  if len(data) > 0 {
+    // parse response
+    err = json.Unmarshal(data, &stack)
     if err != nil {
       return
     }
