@@ -73,7 +73,7 @@ func (td *TutumDecoder) Decode(pack *PipelinePack) (packs []*PipelinePack, err e
   // get ContainerName
   container_name := pack.Message.FindFirstField("ContainerName").GetValueString()[0]
 
-  // if ContainerName is NOT in cache; then get it
+  // if Service is NOT in cache; then get it
   service, ok := td.services[container_name]
   if !ok {
     // find the value
@@ -113,25 +113,27 @@ func (td *TutumDecoder) get_tutum_service(container_name string) (service tutumS
   if err != nil {
     return
   }
+  // if we get back data, then let's parse it. otherwise we can return an empty service
+  if len(data) > 0 {
+    // parse response
+    var resp tutumContainer
+    err = json.Unmarshal(data, &resp)
+    if err != nil {
+      return
+    }
+    // fmt.Printf("json: %v\n\n", resp)
 
-  // parse response
-  var resp tutumContainer
-  err = json.Unmarshal(data, &resp)
-  if err != nil {
-    return
-  }
-  // fmt.Printf("json: %v\n\n", resp)
+    // get service information
+    data, err = td.get_tutum_uri(resp.ServicePath)
+    if err != nil {
+      return
+    }
 
-  // get service information
-  data, err = td.get_tutum_uri(resp.ServicePath)
-  if err != nil {
-    return
-  }
-
-  // parse response
-  err = json.Unmarshal(data, &service)
-  if err != nil {
-    return
+    // parse response
+    err = json.Unmarshal(data, &service)
+    if err != nil {
+      return
+    }
   }
 
   return
