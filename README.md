@@ -1,5 +1,4 @@
-heka-tutum
-=========
+# heka-tutum [![Circle CI](https://circleci.com/gh/ianneub/heka-tutum.svg?style=svg)](https://circleci.com/gh/ianneub/heka-tutum)
 
 This is a decoder plugin that enables decoding docker container names running in the [Tutum.co](http://tutum.co/) Docker environment.
 
