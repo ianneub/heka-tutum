@@ -16,6 +16,7 @@ type testpair struct {
 
 var tests = []testpair {
   {"dash-web-1.mystack.8767ab65", Names{"mystack", "dash-web", "dash-web-1", "8767ab65"}},
+  {"dash-web-1.mystack-dash.8767ab65", Names{"mystack-dash", "dash-web", "dash-web-1", "8767ab65"}},
   {"web-1.mystack.8767ab65", Names{"mystack", "web", "web-1", "8767ab65"}},
   {"web-1.8767ab65", Names{"", "web", "web-1", "8767ab65"}},
   {"dash-web-1.8767ab65", Names{"", "dash-web", "dash-web-1", "8767ab65"}},
