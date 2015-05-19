@@ -2,6 +2,10 @@ machine:
   services:
     - docker
 
+dependencies:
+  override:
+    - echo "none"
+
 test:
   override:
     - make test
